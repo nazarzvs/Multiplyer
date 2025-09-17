@@ -360,6 +360,12 @@ function renderFrame() {
 }
 
 function update(dt) {
+  // Если пауза или игра окончена — не двигаем время и не спавним
+  if (isPaused || isGameOver) {
+    updateStats();
+    return;
+  }
+
   // Таймер и ускорение скорости
   timeAccumulator += dt;
   while (timeAccumulator >= 1) {
@@ -370,12 +376,10 @@ function update(dt) {
   updateStats();
 
   // Спавн задач по частоте в секунду
-  if (!isPaused && !isGameOver) {
-    spawnAccumulator += spawnRatePerSecond * dt;
-    while (spawnAccumulator >= 1 && tasks.length < maxActive) {
-      spawnTask();
-      spawnAccumulator -= 1;
-    }
+  spawnAccumulator += spawnRatePerSecond * dt;
+  while (spawnAccumulator >= 1 && tasks.length < maxActive) {
+    spawnTask();
+    spawnAccumulator -= 1;
   }
 }
 
@@ -387,8 +391,10 @@ function loop(now) {
   currentDeltaTime = isPaused || isGameOver ? 0 : dt;
   update(dt);
   renderFrame();
-
-  rafId = requestAnimationFrame(loop);
+  // После gameOver не планируем следующий кадр, чтобы не перерисовывать экран игры
+  if (!isGameOver) {
+    rafId = requestAnimationFrame(loop);
+  }
 }
 
 /* ======= Start ======= */
