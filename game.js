@@ -25,6 +25,8 @@ const errorSound = document.getElementById("errorSound");
 const bgMusic = document.getElementById("bgMusic");
 
 // === параметры ===
+const VIRTUAL_WIDTH = 600;
+const VIRTUAL_HEIGHT = 800;
 const groundHeight = 50;
 let tasks = [];
 let explosions = [];
@@ -33,13 +35,17 @@ let score = 0;
 let lives = 5;   // теперь 5 жизней
 let time = 0;
 let baseSpeed = 1.0;
-let gameInterval;
-let timerInterval;
+let rafId;
+let lastTimestamp = 0;
+let isPaused = false;
+let timeAccumulator = 0; // seconds accumulator for integer time and speed ramp
 let isGameOver = false;
 let bestScore = parseInt(localStorage.getItem("bestScore")) || 0;
 
 // контроль спавна
-const spawnRate = 0.012;
+// Перевели в частоту в секундах (ранее 0.012 за кадр при 30мс → ~0.4/сек)
+const spawnRatePerSecond = 0.4;
+let spawnAccumulator = 0;
 const maxActive = 6;
 
 let currentMultiplier = 2;
@@ -69,10 +75,11 @@ class Particle {
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
   }
-  update() {
-    this.x += this.speedX;
-    this.y += this.speedY;
-    this.alpha -= 0.04;
+  update(dt, frameScale) {
+    // frameScale ≈ 33.333, чтобы сохранить ту же скорость, что и при 30мс таймере
+    this.x += this.speedX * frameScale * dt;
+    this.y += this.speedY * frameScale * dt;
+    this.alpha -= 0.04 * frameScale * dt;
     this.draw();
   }
 }
@@ -99,7 +106,7 @@ class Task {
   draw() {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
-      p.update();
+      p.update(currentDeltaTime, FRAME_SCALE);
       if (p.alpha <= 0) this.particles.splice(i, 1);
     }
     ctx.beginPath();
@@ -118,8 +125,8 @@ class Task {
     ctx.textAlign = "center";
     ctx.fillText(`${this.a}×${this.b}`, this.x, this.y + 6);
   }
-  update() {
-    this.y += this.speed;
+  update(dt, frameScale) {
+    this.y += this.speed * frameScale * dt;
     if (Math.random() < 0.45) {
       this.particles.push(new Particle(
         this.x + (Math.random() - 0.5) * 6,
@@ -158,8 +165,9 @@ class Explosion {
     ctx.fill();
   }
   update() {
-    this.radius += 2;
-    this.alpha -= 0.05;
+    // Используем глобальные dt/scale, чтобы сохранить прежнюю динамику
+    this.radius += 2 * FRAME_SCALE * currentDeltaTime;
+    this.alpha -= 0.05 * FRAME_SCALE * currentDeltaTime;
     this.draw();
   }
 }
@@ -168,7 +176,7 @@ class Explosion {
 function initCity() {
   cityBuildings = [];
   const num = 10;
-  const slot = canvas.width / num;
+  const slot = VIRTUAL_WIDTH / num;
   for (let i = 0; i < num; i++) {
     let w = 40 + Math.random() * 40;
     let h = 30 + Math.random() * 90;
@@ -177,9 +185,9 @@ function initCity() {
   }
 }
 function drawCity() {
-  const groundY = canvas.height - groundHeight;
+  const groundY = VIRTUAL_HEIGHT - groundHeight;
   ctx.fillStyle = "#2b2b2b";
-  ctx.fillRect(0, groundY, canvas.width, groundHeight);
+  ctx.fillRect(0, groundY, VIRTUAL_WIDTH, groundHeight);
   for (let b of cityBuildings) {
     if (b.h > 2) {
       let bx = b.x;
@@ -194,7 +202,7 @@ function drawCity() {
       }
     } else {
       const cx = b.x + b.w / 2;
-      const cy = canvas.height - groundHeight + 6;
+      const cy = VIRTUAL_HEIGHT - groundHeight + 6;
       ctx.fillStyle = "#3a3a3a";
       ctx.beginPath();
       ctx.ellipse(cx, cy, b.w / 3, 6, 0, 0, Math.PI * 2);
@@ -216,7 +224,7 @@ function spawnTask() {
     }
   }
   const [a, b] = pool.pop();
-  let x = Math.random() * (canvas.width - 80) + 40;
+  let x = Math.random() * (VIRTUAL_WIDTH - 80) + 40;
   tasks.push(new Task(x, -50, a, b));
 }
 
@@ -232,7 +240,7 @@ function updateStats() {
 /* ======= Попадание в город ======= */
 function handleCityHit(taskIndex) {
   const task = tasks[taskIndex];
-  const groundY = canvas.height - groundHeight;
+  const groundY = VIRTUAL_HEIGHT - groundHeight;
   tasks.splice(taskIndex, 1);
   lives--;
   errorSound.play();
@@ -257,24 +265,23 @@ function handleCityHit(taskIndex) {
 /* ======= Game Over ======= */
 function gameOver() {
   isGameOver = true;
-  clearInterval(gameInterval);
-  clearInterval(timerInterval);
+  cancelAnimationFrame(rafId);
   bgMusic.pause();
   if (score > bestScore) {
     bestScore = score;
     localStorage.setItem("bestScore", bestScore);
   }
   ctx.fillStyle = "rgba(0,0,0,0.7)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
   ctx.fillStyle = "red";
   ctx.font = "48px Arial";
   ctx.textAlign = "center";
-  ctx.fillText("Игра окончена!", canvas.width / 2, canvas.height / 2 - 60);
+  ctx.fillText("Игра окончена!", VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 - 60);
   ctx.fillStyle = "white";
   ctx.font = "28px Arial";
-  ctx.fillText(`Очки: ${score}`, canvas.width / 2, canvas.height / 2);
-  ctx.fillText(`Время: ${time} сек`, canvas.width / 2, canvas.height / 2 + 40);
-  ctx.fillText(`Рекорд: ${bestScore}`, canvas.width / 2, canvas.height / 2 + 80);
+  ctx.fillText(`Очки: ${score}`, VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2);
+  ctx.fillText(`Время: ${time} сек`, VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 + 40);
+  ctx.fillText(`Рекорд: ${bestScore}`, VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 + 80);
   restartBtn.style.display = "block";
 }
 
@@ -291,7 +298,7 @@ function resetGame() {
   currentMultiplier = 2;
   pool = shuffle([...Array(8).keys()].map(i => [currentMultiplier, i + 2]));
   initCity();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
   updateStats();
   restartBtn.style.display = "none";
   answerInput.value = "";
@@ -299,13 +306,36 @@ function resetGame() {
 }
 
 /* ======= Game Loop ======= */
-function gameLoop() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+// ======= Адаптивный канвас (DPR + масштаб под окно) =======
+let canvasScale = 1;
+let dpr = Math.max(1, window.devicePixelRatio || 1);
+function resizeCanvas() {
+  dpr = Math.max(1, window.devicePixelRatio || 1);
+  // Не меняем виртуальные размеры, но увеличиваем реальное число пикселей под DPR
+  canvas.width = VIRTUAL_WIDTH * dpr;
+  canvas.height = VIRTUAL_HEIGHT * dpr;
+  // Масштаб под высоту окна, не больше 1 (без апскейла)
+  const maxScaleByHeight = (window.innerHeight - 20) / VIRTUAL_HEIGHT;
+  canvasScale = Math.min(Math.max(0.5, maxScaleByHeight), 1);
+  canvas.style.width = (VIRTUAL_WIDTH * canvasScale) + "px";
+  canvas.style.height = (VIRTUAL_HEIGHT * canvasScale) + "px";
+}
+window.addEventListener("resize", resizeCanvas);
+
+// Глобальные переменные для dt/масштаба кадра
+const FRAME_SCALE = 1000 / 30; // ~33.333 для соответствия прежнему шагу 30мс
+let currentDeltaTime = 0; // в секундах
+
+function renderFrame() {
+  // Настраиваем трансформацию: сначала DPR, затем визуальный масштаб
+  ctx.setTransform(dpr * canvasScale, 0, 0, dpr * canvasScale, 0, 0);
+  ctx.clearRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
   drawCity();
+
   for (let i = tasks.length - 1; i >= 0; i--) {
     const t = tasks[i];
-    t.update();
-    if (t.y + t.radius >= canvas.height - groundHeight) handleCityHit(i);
+    t.update(currentDeltaTime, FRAME_SCALE);
+    if (t.y + t.radius >= VIRTUAL_HEIGHT - groundHeight) handleCityHit(i);
   }
   for (let i = explosions.length - 1; i >= 0; i--) {
     const e = explosions[i];
@@ -314,26 +344,65 @@ function gameLoop() {
   }
   for (let i = debrisParticles.length - 1; i >= 0; i--) {
     const p = debrisParticles[i];
-    p.update();
+    p.update(currentDeltaTime, FRAME_SCALE);
     if (p.alpha <= 0) debrisParticles.splice(i, 1);
   }
-  if (tasks.length < maxActive && Math.random() < spawnRate) spawnTask();
+
+  // Пауза — затемняем и выводим текст
+  if (isPaused && !isGameOver) {
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+    ctx.fillStyle = "#fff";
+    ctx.font = "36px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Пауза", VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2);
+  }
+}
+
+function update(dt) {
+  // Таймер и ускорение скорости
+  timeAccumulator += dt;
+  while (timeAccumulator >= 1) {
+    time++;
+    if (time % 45 === 0) baseSpeed += 0.10;
+    timeAccumulator -= 1;
+  }
+  updateStats();
+
+  // Спавн задач по частоте в секунду
+  if (!isPaused && !isGameOver) {
+    spawnAccumulator += spawnRatePerSecond * dt;
+    while (spawnAccumulator >= 1 && tasks.length < maxActive) {
+      spawnTask();
+      spawnAccumulator -= 1;
+    }
+  }
+}
+
+function loop(now) {
+  if (lastTimestamp === 0) lastTimestamp = now;
+  const dt = Math.min(0.05, (now - lastTimestamp) / 1000); // clamp 50ms
+  lastTimestamp = now;
+
+  currentDeltaTime = isPaused || isGameOver ? 0 : dt;
+  update(dt);
+  renderFrame();
+
+  rafId = requestAnimationFrame(loop);
 }
 
 /* ======= Start ======= */
 function startGame() {
   initCity();
-  gameInterval = setInterval(gameLoop, 30);
-  timerInterval = setInterval(() => {
-    time++;
-    if (time % 45 === 0) baseSpeed += 0.10;
-    updateStats();
-  }, 1000);
+  resizeCanvas();
+  lastTimestamp = 0;
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
 }
 
 /* ======= Input ======= */
 answerInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !isGameOver) {
+  if (e.key === "Enter" && !isGameOver && !isPaused) {
     const val = parseInt(answerInput.value);
     if (isNaN(val)) return;
     let found = false;
@@ -364,9 +433,13 @@ restartBtn.addEventListener("click", resetGame);
 let musicStarted = false;
 document.addEventListener("click", () => {
   if (!musicStarted) {
-    bgMusic.volume = 0.05;
+    const savedMuted = localStorage.getItem("musicMuted") === "true";
+    const savedVol = parseFloat(localStorage.getItem("musicVolume"));
+    bgMusic.volume = isNaN(savedVol) ? 0.05 : Math.min(1, Math.max(0, savedVol));
+    if (!savedMuted) {
     bgMusic.currentTime = 0;
     bgMusic.play().catch(() => {});
+    }
     musicStarted = true;
   }
 });
@@ -374,12 +447,32 @@ musicBtn.addEventListener("click", () => {
   if (bgMusic.paused) {
     bgMusic.play().catch(() => {});
     musicBtn.textContent = "🎵 Музыка: Вкл";
+    localStorage.setItem("musicMuted", "false");
   } else {
     bgMusic.pause();
     musicBtn.textContent = "🎵 Музыка: Выкл";
+    localStorage.setItem("musicMuted", "true");
+  }
+});
+
+// ======= Пауза/Возобновление =======
+document.addEventListener("keydown", (e) => {
+  if (e.key === "p" || e.key === "P") {
+    if (isGameOver) return;
+    isPaused = !isPaused;
+    if (isPaused) {
+      bgMusic.pause();
+    } else {
+      const muted = localStorage.getItem("musicMuted") === "true";
+      if (!muted) bgMusic.play().catch(() => {});
+    }
   }
 });
 
 /* ======= Запуск ======= */
+// Восстанавливаем метку на кнопке музыки из сохранённого состояния
+const initMuted = localStorage.getItem("musicMuted") === "true";
+musicBtn.textContent = initMuted ? "🎵 Музыка: Выкл" : "🎵 Музыка: Вкл";
+
 updateStats();
 startGame();
