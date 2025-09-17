@@ -1,4 +1,4 @@
-// game.js — версия с 5 жизнями и кнопкой музыки
+// game.js — версия с 5 жизнями и кнопкой музыки (Shahed дроны)
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
@@ -109,38 +109,91 @@ class Task {
       p.update(currentDeltaTime, FRAME_SCALE);
       if (p.alpha <= 0) this.particles.splice(i, 1);
     }
+    // Силуэт Shahed: дельтовидное крыло с носом вниз
+    // Треугольный планер
     ctx.beginPath();
-    ctx.moveTo(this.x + this.shape[0].x, this.y + this.shape[0].y);
-    for (let i = 1; i < this.shape.length; i++) {
-      ctx.lineTo(this.x + this.shape[i].x, this.y + this.shape[i].y);
-    }
+    const noseX = this.x;
+    const noseY = this.y + this.radius * 0.9; // нос вниз по направлению падения
+    const leftWingX = this.x - this.radius * 1.2;
+    const rightWingX = this.x + this.radius * 1.2;
+    const wingY = this.y - this.radius * 0.2;
+    ctx.moveTo(noseX, noseY);
+    ctx.lineTo(rightWingX, wingY);
+    ctx.lineTo(leftWingX, wingY);
     ctx.closePath();
-    const gradient = ctx.createRadialGradient(this.x, this.y, 5, this.x, this.y, this.radius);
-    gradient.addColorStop(0, "#ffaa66");
-    gradient.addColorStop(1, "#552200");
-    ctx.fillStyle = gradient;
+    const bodyGradient = ctx.createLinearGradient(this.x, wingY, this.x, noseY);
+    bodyGradient.addColorStop(0, "#e6e6e6");
+    bodyGradient.addColorStop(1, "#bdbdbd");
+    ctx.fillStyle = bodyGradient;
     ctx.fill();
-    ctx.fillStyle = "white";
-    ctx.font = "20px Arial";
+
+    // Центральный фюзеляж (светлая «спинка»)
+    ctx.fillStyle = "#f2f2f2";
+    ctx.beginPath();
+    ctx.moveTo(noseX, noseY - this.radius * 0.15);
+    ctx.lineTo(this.x + this.radius * 0.25, wingY + this.radius * 0.05);
+    ctx.lineTo(this.x - this.radius * 0.25, wingY + this.radius * 0.05);
+    ctx.closePath();
+    ctx.fill();
+
+    // Вертикальные кили на законцовках крыла
+    ctx.fillStyle = "#d9d9d9";
+    const finH = this.radius * 0.25;
+    const finW = this.radius * 0.12;
+    ctx.beginPath();
+    ctx.moveTo(leftWingX, wingY);
+    ctx.lineTo(leftWingX - finW, wingY - finH);
+    ctx.lineTo(leftWingX + finW, wingY - finH * 0.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(rightWingX, wingY);
+    ctx.lineTo(rightWingX + finW, wingY - finH);
+    ctx.lineTo(rightWingX - finW, wingY - finH * 0.6);
+    ctx.closePath();
+    ctx.fill();
+
+    // Задний винт (вид снизу — круг с размытыми лопастями)
+    const propX = this.x;
+    const propY = wingY - this.radius * 0.1; // позади крыла (сверху относительно движения)
+    ctx.beginPath();
+    ctx.arc(propX, propY, this.radius * 0.12, 0, Math.PI * 2);
+    ctx.fillStyle = "#888";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(120,120,120,0.6)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(propX - this.radius * 0.25, propY);
+    ctx.lineTo(propX + this.radius * 0.25, propY);
+    ctx.moveTo(propX, propY - this.radius * 0.25);
+    ctx.lineTo(propX, propY + this.radius * 0.25);
+    ctx.stroke();
+
+    // Маркировка задачи в центре
+    ctx.fillStyle = "#333";
+    ctx.font = "16px Arial";
     ctx.textAlign = "center";
-    ctx.fillText(`${this.a}×${this.b}`, this.x, this.y + 6);
+    ctx.fillText(`${this.a}×${this.b}`, this.x, this.y + this.radius * 0.15);
   }
   update(dt, frameScale) {
     this.y += this.speed * frameScale * dt;
     if (Math.random() < 0.45) {
+      // Шлейф позади дельтовидного крыла
+      const trailX = this.x + (Math.random() - 0.5) * this.radius * 0.5;
+      const trailY = this.y - this.radius * 0.4;
       this.particles.push(new Particle(
-        this.x + (Math.random() - 0.5) * 6,
-        this.y - this.radius * 0.6,
-        "255,120,0",
-        (Math.random() - 0.5) * 0.6,
-        -(Math.random() * 1 + 0.6)
+        trailX,
+        trailY,
+        "160,160,160",
+        (Math.random() - 0.5) * 0.3,
+        -(Math.random() * 0.1 + 0.05)
       ));
       this.particles.push(new Particle(
-        this.x + (Math.random() - 0.5) * 6,
-        this.y - this.radius * 0.4,
-        "255,200,50",
-        (Math.random() - 0.5) * 0.6,
-        -(Math.random() * 0.6 + 0.3)
+        trailX,
+        trailY - 2,
+        "120,120,120",
+        (Math.random() - 0.5) * 0.25,
+        -(Math.random() * 0.05 + 0.02)
       ));
     }
     this.draw();
@@ -211,7 +264,7 @@ function drawCity() {
   }
 }
 
-/* ======= Спавн ======= */
+/* ======= Спавн дронов ======= */
 function spawnTask() {
   if (pool.length === 0) {
     currentMultiplier++;
@@ -225,7 +278,7 @@ function spawnTask() {
   }
   const [a, b] = pool.pop();
   let x = Math.random() * (VIRTUAL_WIDTH - 80) + 40;
-  tasks.push(new Task(x, -50, a, b));
+  tasks.push(new Task(x, -50, a, b)); // Спавним Shahed дрон
 }
 
 /* ======= Статистика ======= */
@@ -237,7 +290,7 @@ function updateStats() {
   timeEl.textContent = time;
 }
 
-/* ======= Попадание в город ======= */
+/* ======= Попадание дрона в город ======= */
 function handleCityHit(taskIndex) {
   const task = tasks[taskIndex];
   const groundY = VIRTUAL_HEIGHT - groundHeight;
@@ -257,7 +310,7 @@ function handleCityHit(taskIndex) {
     const damage = Math.floor(20 + Math.random() * 40);
     hitBuilding.h -= damage;
     if (hitBuilding.h < 0) hitBuilding.h = 0;
-    explosions.push(new Explosion(hitBuilding.x + hitBuilding.w / 2, groundY - 10));
+    explosions.push(new Explosion(hitBuilding.x + hitBuilding.w / 2, groundY - 10)); // Взрыв от дрона
   }
   if (lives <= 0) gameOver();
 }
