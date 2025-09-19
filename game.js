@@ -169,11 +169,14 @@ class Task {
     ctx.lineTo(propX, propY + this.radius * 0.25);
     ctx.stroke();
 
-    // Маркировка задачи в центре
-    ctx.fillStyle = "#333";
-    ctx.font = "16px Arial";
+    // Маркировка задачи в центре — контрастная надпись
+    ctx.font = "bold 22px Arial";
     ctx.textAlign = "center";
-    ctx.fillText(`${this.a}×${this.b}`, this.x, this.y + this.radius * 0.15);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#000";
+    ctx.strokeText(`${this.a}×${this.b}`, this.x, this.y + this.radius * 0.15 + 12);
+    ctx.fillStyle = "#ff6600";
+    ctx.fillText(`${this.a}×${this.b}`, this.x, this.y + this.radius * 0.15 + 12);
   }
   update(dt, frameScale) {
     this.y += this.speed * frameScale * dt;
