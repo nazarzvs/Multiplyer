@@ -5,14 +5,7 @@ const ctx = canvas.getContext("2d");
 const answerInput = document.getElementById("answerInput");
 const restartBtn = document.getElementById("restartBtn");
 
-// создаём кнопку музыки в статистике
-const statsDiv = document.getElementById("stats");
-const musicBtn = document.createElement("button");
-musicBtn.textContent = "🎵 Музыка: Вкл";
-musicBtn.style.marginLeft = "15px";
-musicBtn.style.padding = "5px 10px";
-musicBtn.style.fontSize = "16px";
-statsDiv.appendChild(musicBtn);
+
 
 const timeEl = document.getElementById("time");
 const scoreEl = document.getElementById("score");
@@ -339,6 +332,7 @@ function gameOver() {
   ctx.fillText(`Время: ${time} сек`, VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 + 40);
   ctx.fillText(`Рекорд: ${bestScore}`, VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 + 80);
   restartBtn.style.display = "block";
+  virtualKeyboard.style.display = "none";
 }
 
 /* ======= Reset ======= */
@@ -358,23 +352,29 @@ function resetGame() {
   updateStats();
   restartBtn.style.display = "none";
   answerInput.value = "";
+  virtualKeyboard.style.display = "";
   startGame();
 }
 
 /* ======= Game Loop ======= */
-// ======= Адаптивный канвас (DPR + масштаб под окно) =======
-let canvasScale = 1;
-let dpr = Math.max(1, window.devicePixelRatio || 1);
+// ======= Адаптивный канвас =======
 function resizeCanvas() {
-  dpr = Math.max(1, window.devicePixelRatio || 1);
-  // Не меняем виртуальные размеры, но увеличиваем реальное число пикселей под DPR
-  canvas.width = VIRTUAL_WIDTH * dpr;
-  canvas.height = VIRTUAL_HEIGHT * dpr;
-  // Масштаб под высоту окна, не больше 1 (без апскейла)
-  const maxScaleByHeight = (window.innerHeight - 20) / VIRTUAL_HEIGHT;
-  canvasScale = Math.min(Math.max(0.5, maxScaleByHeight), 1);
-  canvas.style.width = (VIRTUAL_WIDTH * canvasScale) + "px";
-  canvas.style.height = (VIRTUAL_HEIGHT * canvasScale) + "px";
+    // Set canvas size to its display size
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.clientWidth * dpr;
+    canvas.height = canvas.clientHeight * dpr;
+
+    // Calculate scale to fit VIRTUAL_WIDTH/HEIGHT
+    const scaleX = canvas.width / dpr / VIRTUAL_WIDTH;
+    const scaleY = canvas.height / dpr / VIRTUAL_HEIGHT;
+    const scale = Math.min(scaleX, scaleY);
+
+    // Center the game
+    const offsetX = (canvas.width / dpr - VIRTUAL_WIDTH * scale) / 2;
+    const offsetY = (canvas.height / dpr - VIRTUAL_HEIGHT * scale) / 2;
+
+    // Set transform
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, offsetX * dpr, offsetY * dpr);
 }
 window.addEventListener("resize", resizeCanvas);
 
@@ -383,9 +383,12 @@ const FRAME_SCALE = 1000 / 30; // ~33.333 для соответствия пре
 let currentDeltaTime = 0; // в секундах
 
 function renderFrame() {
-  // Настраиваем трансформацию: сначала DPR, затем визуальный масштаб
-  ctx.setTransform(dpr * canvasScale, 0, 0, dpr * canvasScale, 0, 0);
-  ctx.clearRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+  // The transform is set in resizeCanvas, so we just clear the rect.
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+
   drawCity();
 
   for (let i = tasks.length - 1; i >= 0; i--) {
@@ -463,59 +466,41 @@ function startGame() {
 }
 
 /* ======= Input ======= */
-answerInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !isGameOver && !isPaused) {
-    const val = parseInt(answerInput.value);
-    if (isNaN(val)) return;
-    let found = false;
-    for (let i = 0; i < tasks.length; i++) {
-      if (tasks[i].answer === val) {
-        const t = tasks[i];
-        score += 10;
-        explosionSound.currentTime = 0;
-        explosionSound.play();
-        explosions.push(new Explosion(t.x, t.y));
-        tasks.splice(i, 1);
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      lives--;
-      errorSound.play();
-      if (lives <= 0) gameOver();
-    }
-    answerInput.value = "";
-    updateStats();
-  }
-});
 restartBtn.addEventListener("click", resetGame);
 
 /* ======= Музыка ======= */
 let musicStarted = false;
+function toggleMusic() {
+  const musicBtn = document.querySelector('.keyboard-btn[data-key="music"]');
+  if (bgMusic.paused) {
+    bgMusic.play().catch(() => {});
+    musicBtn.classList.remove('off');
+    localStorage.setItem("musicMuted", "false");
+  } else {
+    bgMusic.pause();
+    musicBtn.classList.add('off');
+    localStorage.setItem("musicMuted", "true");
+  }
+}
+
 document.addEventListener("click", () => {
   if (!musicStarted) {
     const savedMuted = localStorage.getItem("musicMuted") === "true";
     const savedVol = parseFloat(localStorage.getItem("musicVolume"));
     bgMusic.volume = isNaN(savedVol) ? 0.05 : Math.min(1, Math.max(0, savedVol));
     if (!savedMuted) {
-    bgMusic.currentTime = 0;
-    bgMusic.play().catch(() => {});
+      bgMusic.currentTime = 0;
+      bgMusic.play().catch(() => {});
+    } else {
+        const musicBtn = document.querySelector('.keyboard-btn[data-key="music"]');
+        if (musicBtn) {
+            musicBtn.classList.add('off');
+        }
     }
     musicStarted = true;
   }
 });
-musicBtn.addEventListener("click", () => {
-  if (bgMusic.paused) {
-    bgMusic.play().catch(() => {});
-    musicBtn.textContent = "🎵 Музыка: Вкл";
-    localStorage.setItem("musicMuted", "false");
-  } else {
-    bgMusic.pause();
-    musicBtn.textContent = "🎵 Музыка: Выкл";
-    localStorage.setItem("musicMuted", "true");
-  }
-});
+
 
 // ======= Пауза/Возобновление =======
 document.addEventListener("keydown", (e) => {
@@ -531,10 +516,94 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+/* ======= Виртуальная клавиатура ======= */
+const virtualKeyboard = document.getElementById("virtualKeyboard");
+const keyboardButtons = virtualKeyboard.querySelectorAll(".keyboard-btn");
+
+// Обработка нажатий на виртуальную клавиатуру
+keyboardButtons.forEach(button => {
+  // Добавляем тактильную обратную связь
+  button.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    button.style.transform = "scale(0.95)";
+  });
+  
+  button.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    button.style.transform = "scale(1)";
+
+    const key = button.dataset.key;
+    
+    if (key === "enter") {
+      // Отправляем ответ
+      if (!isGameOver && !isPaused) {
+        const val = parseInt(answerInput.value);
+        if (!isNaN(val)) {
+          submitAnswer(val);
+        }
+      }
+    } else if (key === "clear") {
+      // Очищаем поле ввода
+      answerInput.value = "";
+    } else if (key === "music") {
+      toggleMusic();
+    } else {
+      // Добавляем цифру
+      answerInput.value += key;
+    }
+    
+    // Фокусируемся на поле ввода для визуальной обратной связи
+    answerInput.focus();
+  });
+});
+
+// Функция отправки ответа (вынесена из обработчика Enter)
+function submitAnswer(val) {
+  let found = false;
+  for (let i = 0; i < tasks.length; i++) {
+    if (tasks[i].answer === val) {
+      const t = tasks[i];
+      score += 10;
+      explosionSound.currentTime = 0;
+      explosionSound.play();
+      explosions.push(new Explosion(t.x, t.y));
+      tasks.splice(i, 1);
+      found = true;
+      
+      // Haptic feedback для правильного ответа
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+      break;
+    }
+  }
+  if (!found) {
+    lives--;
+    errorSound.play();
+    
+    // Haptic feedback для неправильного ответа
+    if (navigator.vibrate) {
+      navigator.vibrate([100, 50, 100]);
+    }
+    
+    if (lives <= 0) gameOver();
+  }
+  answerInput.value = "";
+  updateStats();
+}
+
+// Обновляем обработчик Enter для использования новой функции
+answerInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !isGameOver && !isPaused) {
+    const val = parseInt(answerInput.value);
+    if (!isNaN(val)) {
+      submitAnswer(val);
+    }
+  }
+});
+
 /* ======= Запуск ======= */
-// Восстанавливаем метку на кнопке музыки из сохранённого состояния
-const initMuted = localStorage.getItem("musicMuted") === "true";
-musicBtn.textContent = initMuted ? "🎵 Музыка: Выкл" : "🎵 Музыка: Вкл";
+
 
 updateStats();
 startGame();

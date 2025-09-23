@@ -6,6 +6,7 @@
   <title>Тренажёр Таблицы Умножения — Защита от дронов</title>
   <style>
     body {
+      height: 100vh;
       margin: 0;
       font-family: Arial, sans-serif;
       overflow: hidden;
@@ -13,69 +14,201 @@
       color: white;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     h1 {
       text-align: center;
       margin: 10px 0;
-      margin-left: 158px;
+      font-size: clamp(16px, 4vw, 24px);
     }
 
     #gameArea {
       display: flex;
-      flex-direction: row;
+      flex-direction: column;
       justify-content: center;
-      align-items: flex-start;
-      gap: 20px;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 100vw;
+      flex: 1;
+      min-height: 0;
+    }
+
+    @media (min-width: 768px) {
+      #gameArea {
+        flex-direction: row;
+        gap: 20px;
+      }
+      
+      h1 {
+        margin-left: 158px;
+      }
     }
 
     #gameCanvas {
       background-color: #111;
       display: block;
       border: 2px solid white;
+      max-width: 100vw;
+      width: 100%;
+      flex-grow: 1;
+      min-height: 0;
     }
 
     #stats {
-      font-size: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      font-size: clamp(14px, 3vw, 18px);
       line-height: 1.6;
-      text-align: left;
+      text-align: center;
+    }
+
+    @media (min-width: 768px) {
+      #stats {
+        text-align: left;
+        order: 1;
+      }
     }
 
     #heartContainer {
-      font-size: 22px;
-      display: block;
-      margin-top: 5px;
+      display: none;
     }
 
     #inputArea {
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
-      gap: 15px;
+      gap: 10px;
       margin-top: 10px;
-      margin-left: 158px;
+      width: 100%;
+    }
+
+    @media (min-width: 768px) {
+      #inputArea {
+        flex-direction: row;
+        margin-left: 158px;
+      }
     }
 
     input {
-      padding: 10px;
-      font-size: 20px;
+      padding: 12px;
+      font-size: clamp(18px, 4vw, 20px);
       width: 150px;
       text-align: center;
+      border: 2px solid #666;
+      border-radius: 8px;
+      background: #222;
+      color: white;
     }
 
     #restartBtn {
       display: none;
-      padding: 10px 20px;
-      font-size: 18px;
+      padding: 12px 24px;
+      font-size: clamp(16px, 3.5vw, 18px);
       cursor: pointer;
       background: #222;
       color: white;
       border: 2px solid white;
       border-radius: 10px;
+      min-height: 44px;
+      touch-action: manipulation;
     }
-    #restartBtn:hover {
+    #restartBtn:hover, #restartBtn:active {
       background: #444;
+    }
+
+    /* Виртуальная клавиатура */
+    #virtualKeyboard {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #111;
+      border-top: 2px solid #333;
+      padding: 10px;
+      z-index: 1000;
+    }
+
+    .keyboard-row {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .keyboard-btn {
+      width: 60px;
+      height: 50px;
+      font-size: 20px;
+      font-weight: bold;
+      background: #333;
+      color: white;
+      border: 2px solid #555;
+      border-radius: 8px;
+      cursor: pointer;
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+    }
+
+    .keyboard-btn:hover, .keyboard-btn:active {
+      background: #555;
+    }
+
+    .keyboard-btn.wide {
+      width: 120px;
+    }
+
+    .keyboard-btn.enter {
+      background: #4CAF50;
+      border-color: #66BB6A;
+    }
+
+    .keyboard-btn.enter:hover, .keyboard-btn.enter:active {
+      background: #66BB6A;
+    }
+
+    .keyboard-btn.clear {
+      background: #f44336;
+      border-color: #ef5350;
+    }
+
+    .keyboard-btn.clear:hover, .keyboard-btn.clear:active {
+      background: #ef5350;
+    }
+
+    .keyboard-btn.music {
+      background: #607D8B;
+      border-color: #78909C;
+    }
+
+    .keyboard-btn.music:hover, .keyboard-btn.music:active {
+      background: #78909C;
+    }
+
+    .keyboard-btn.music.off {
+      background: #333;
+      border-color: #555;
+    }
+
+    /* Показывать клавиатуру на мобильных */
+    @media (max-width: 767px) {
+      #virtualKeyboard {
+        display: block;
+      }
+      
+      #gameArea {
+        margin-bottom: 80px;
+      }
     }
   </style>
 </head>
@@ -84,19 +217,42 @@
 
   <div id="gameArea">
     <div id="stats">
-      ⏱️ Время: <span id="time">0</span> сек<br>
-      🧮 Очки: <span id="score">0</span><br>
-      🏆 Рекорд: <span id="best">0</span><br>
-      ❤️ Жизни: <span id="lives">3</span><br>
+      <span>⏱️ Время: <span id="time">0</span> сек</span>
+      <span>🧮 Очки: <span id="score">0</span></span>
+      <span>🏆 Рекорд: <span id="best">0</span></span>
+      <span>❤️ Жизни: <span id="lives">3</span></span>
       <span id="heartContainer">❤️❤️❤️</span>
     </div>
 
     <canvas id="gameCanvas" width="600" height="800"></canvas>
+
+    <div id="inputArea">
+      <input id="answerInput" placeholder="Введите ответ" autofocus readonly />
+      <button id="restartBtn">🔄 Начать снова</button>
+    </div>
   </div>
 
-  <div id="inputArea">
-    <input id="answerInput" placeholder="Введите ответ" autofocus />
-    <button id="restartBtn">🔄 Начать снова</button>
+  <!-- Виртуальная клавиатура -->
+  <div id="virtualKeyboard">
+    <div class="keyboard-row">
+      <button class="keyboard-btn" data-key="1">1</button>
+      <button class="keyboard-btn" data-key="2">2</button>
+      <button class="keyboard-btn" data-key="3">3</button>
+      <button class="keyboard-btn" data-key="4">4</button>
+      <button class="keyboard-btn" data-key="5">5</button>
+    </div>
+    <div class="keyboard-row">
+      <button class="keyboard-btn" data-key="6">6</button>
+      <button class="keyboard-btn" data-key="7">7</button>
+      <button class="keyboard-btn" data-key="8">8</button>
+      <button class="keyboard-btn" data-key="9">9</button>
+      <button class="keyboard-btn" data-key="0">0</button>
+    </div>
+    <div class="keyboard-row">
+      <button class="keyboard-btn music" data-key="music">🎵</button>
+      <button class="keyboard-btn clear" data-key="clear">⌫</button>
+      <button class="keyboard-btn enter wide" data-key="enter">Ответить</button>
+    </div>
   </div>
 
   <!-- Звуки -->
