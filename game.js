@@ -15,6 +15,7 @@ const heartContainer = document.getElementById("heartContainer");
 
 const explosionSound = document.getElementById("explosionSound");
 const errorSound = document.getElementById("errorSound");
+const clickSound = document.getElementById("clickSound");
 const bgMusic = document.getElementById("bgMusic");
 
 // === параметры ===
@@ -533,6 +534,13 @@ keyboardButtons.forEach(button => {
     button.style.transform = "scale(1)";
 
     const key = button.dataset.key;
+
+    if (key !== 'enter' && key !== 'clear') {
+      if (clickSound) {
+        clickSound.currentTime = 0;
+        clickSound.play();
+      }
+    }
     
     if (key === "enter") {
       // Отправляем ответ
