@@ -586,7 +586,6 @@ function submitAnswer(val) {
     }
   }
   if (!found) {
-    lives--;
     errorSound.play();
     
     // Haptic feedback для неправильного ответа
