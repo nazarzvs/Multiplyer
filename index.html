@@ -26,6 +26,7 @@
     }
 
     #gameArea {
+      position: relative; /* Для абсолютного позиционирования кнопки музыки */
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -120,6 +121,13 @@
     }
     #restartBtn:hover, #restartBtn:active {
       background: #444;
+    }
+
+    #music-btn {
+      position: absolute;
+      top: 20px;
+      right: 10px;
+      z-index: 100;
     }
 
     /* Виртуальная клавиатура */
@@ -225,6 +233,8 @@
 
     <canvas id="gameCanvas" width="600" height="800"></canvas>
 
+    <button id="music-btn" class="keyboard-btn music">🎵</button>
+
     <div id="inputArea">
       <input id="answerInput" placeholder="Введите ответ" autofocus readonly />
       <button id="restartBtn">🔄 Начать снова</button>
@@ -246,11 +256,6 @@
       <button class="keyboard-btn" data-key="8">8</button>
       <button class="keyboard-btn" data-key="9">9</button>
       <button class="keyboard-btn" data-key="0">0</button>
-    </div>
-    <div class="keyboard-row">
-      <button class="keyboard-btn music" data-key="music">🎵</button>
-      <button class="keyboard-btn clear" data-key="clear">⌫</button>
-      <button class="keyboard-btn enter wide" data-key="enter">Ответить</button>
     </div>
   </div>
 

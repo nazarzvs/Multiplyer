@@ -4,6 +4,7 @@ const ctx = canvas.getContext("2d");
 
 const answerInput = document.getElementById("answerInput");
 const restartBtn = document.getElementById("restartBtn");
+const musicBtn = document.getElementById("music-btn");
 
 
 
@@ -38,7 +39,7 @@ let bestScore = parseInt(localStorage.getItem("bestScore")) || 0;
 
 // контроль спавна
 // Перевели в частоту в секундах (ранее 0.012 за кадр при 30мс → ~0.4/сек)
-const spawnRatePerSecond = 0.4;
+let spawnRatePerSecond = 0.2;
 let spawnAccumulator = 0;
 const maxActive = 6;
 
@@ -345,6 +346,7 @@ function resetGame() {
   lives = 5;
   time = 0;
   baseSpeed = 1.0;
+  spawnRatePerSecond = 0.2;
   isGameOver = false;
   currentMultiplier = 2;
   pool = shuffle([...Array(8).keys()].map(i => [currentMultiplier, i + 2]));
@@ -430,7 +432,10 @@ function update(dt) {
   timeAccumulator += dt;
   while (timeAccumulator >= 1) {
     time++;
-    if (time % 45 === 0) baseSpeed += 0.10;
+    if (time % 45 === 0) {
+      baseSpeed += 0.10;
+      spawnRatePerSecond += 0.04;
+    }
     timeAccumulator -= 1;
   }
   updateStats();
@@ -468,11 +473,11 @@ function startGame() {
 
 /* ======= Input ======= */
 restartBtn.addEventListener("click", resetGame);
+musicBtn.addEventListener("click", toggleMusic);
 
 /* ======= Музыка ======= */
 let musicStarted = false;
 function toggleMusic() {
-  const musicBtn = document.querySelector('.keyboard-btn[data-key="music"]');
   if (bgMusic.paused) {
     bgMusic.play().catch(() => {});
     musicBtn.classList.remove('off');
@@ -493,7 +498,6 @@ document.addEventListener("click", () => {
       bgMusic.currentTime = 0;
       bgMusic.play().catch(() => {});
     } else {
-        const musicBtn = document.querySelector('.keyboard-btn[data-key="music"]');
         if (musicBtn) {
             musicBtn.classList.add('off');
         }
@@ -542,22 +546,26 @@ keyboardButtons.forEach(button => {
       }
     }
     
-    if (key === "enter") {
-      // Отправляем ответ
-      if (!isGameOver && !isPaused) {
-        const val = parseInt(answerInput.value);
-        if (!isNaN(val)) {
-          submitAnswer(val);
+    // Добавляем цифру
+    answerInput.value += key;
+    const val = parseInt(answerInput.value);
+    if (!isNaN(val)) {
+      // Проверяем, есть ли такой ответ
+      const taskExists = tasks.some(t => t.answer.toString().startsWith(answerInput.value));
+      if (!taskExists) {
+        // Если нет задач с таким началом ответа, это ошибка
+        errorSound.play();
+        if (navigator.vibrate) {
+          navigator.vibrate([100, 50, 100]);
         }
+        answerInput.value = ""; // Сбрасываем
+      } else {
+          // Если есть полное совпадение, отправляем ответ
+          const matchingTask = tasks.find(t => t.answer === val);
+          if (matchingTask) {
+              submitAnswer(val);
+          }
       }
-    } else if (key === "clear") {
-      // Очищаем поле ввода
-      answerInput.value = "";
-    } else if (key === "music") {
-      toggleMusic();
-    } else {
-      // Добавляем цифру
-      answerInput.value += key;
     }
     
     // Фокусируемся на поле ввода для визуальной обратной связи
