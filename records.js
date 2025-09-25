@@ -1,0 +1,38 @@
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyAm_Nm2NkfYz0bMYAJQGy9o6rxez_KPJKs",
+  authDomain: "multiplyer-leaderboard.firebaseapp.com",
+  databaseURL: "https://multiplyer-leaderboard-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "multiplyer-leaderboard",
+  storageBucket: "multiplyer-leaderboard.appspot.com",
+  messagingSenderId: "1055294957322",
+  appId: "1:1055294957322:web:7b5b0f9539bc57c4affcf3",
+  measurementId: "G-KPVYV8Y0RG"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+/* ======= Таблица рекордов (Firebase) ======= */
+function displayLeaderboard() {
+  const leaderboardList = document.getElementById('leaderboardList');
+  const scoresRef = database.ref('scores').orderByChild('score').limitToLast(10);
+
+  scoresRef.on('value', (snapshot) => {
+    leaderboardList.innerHTML = '';
+    const scores = [];
+    snapshot.forEach((childSnapshot) => {
+      scores.push(childSnapshot.val());
+    });
+    // Sort descending
+    scores.reverse();
+    scores.forEach((score) => {
+      const li = document.createElement('li');
+      li.textContent = `${score.name}: ${score.score} (${score.time}s)`;
+      leaderboardList.appendChild(li);
+    });
+  });
+}
+
+displayLeaderboard();

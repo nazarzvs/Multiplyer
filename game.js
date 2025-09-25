@@ -1,10 +1,32 @@
 // game.js — версия с 5 жизнями и кнопкой музыки (Shahed дроны)
+
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyAm_Nm2NkfYz0bMYAJQGy9o6rxez_KPJKs",
+  authDomain: "multiplyer-leaderboard.firebaseapp.com",
+  databaseURL: "https://multiplyer-leaderboard-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "multiplyer-leaderboard",
+  storageBucket: "multiplyer-leaderboard.appspot.com",
+  messagingSenderId: "1055294957322",
+  appId: "1:1055294957322:web:7b5b0f9539bc57c4affcf3",
+  measurementId: "G-KPVYV8Y0RG"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 const answerInput = document.getElementById("answerInput");
 const restartBtn = document.getElementById("restartBtn");
 const musicBtn = document.getElementById("music-btn");
+
+// Элементы модального окна имени
+const nameModal = document.getElementById("nameModal");
+const nameInput = document.getElementById("nameInput");
+const saveNameBtn = document.getElementById("saveNameBtn");
 
 
 
@@ -321,6 +343,8 @@ function gameOver() {
   if (score > bestScore) {
     bestScore = score;
     localStorage.setItem("bestScore", bestScore);
+    const playerName = localStorage.getItem("playerName") || "Игрок";
+    saveScoreToLeaderboard(playerName, score, time);
   }
   ctx.fillStyle = "rgba(0,0,0,0.7)";
   ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
@@ -461,6 +485,40 @@ function loop(now) {
     rafId = requestAnimationFrame(loop);
   }
 }
+
+/* ======= Управление именем игрока ======= */
+function setupPlayerName() {
+  const playerName = localStorage.getItem("playerName");
+  if (!playerName) {
+    nameModal.style.display = "flex";
+  } else {
+    startGame();
+  }
+
+  saveNameBtn.addEventListener("click", () => {
+    let name = nameInput.value.trim();
+    if (name === "") {
+      name = "Игрок";
+    }
+    localStorage.setItem("playerName", name);
+    nameModal.style.display = "none";
+    startGame();
+  });
+}
+
+/* ======= Таблица рекордов (Firebase) ======= */
+function saveScoreToLeaderboard(playerName, score, time) {
+  const newScoreRef = database.ref('scores').push();
+  newScoreRef.set({
+    name: playerName,
+    score: score,
+    time: time,
+    timestamp: Date.now()
+  });
+}
+
+
+
 
 /* ======= Start ======= */
 function startGame() {
@@ -619,6 +677,5 @@ answerInput.addEventListener("keydown", (e) => {
 
 /* ======= Запуск ======= */
 
-
+setupPlayerName();
 updateStats();
-startGame();

@@ -125,9 +125,47 @@
 
     #music-btn {
       position: absolute;
-      top: 20px;
+      top: 10px;
       right: 10px;
       z-index: 100;
+    }
+
+
+
+    /* Модальное окно для имени */
+    #nameModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      display: none; /* По умолчанию скрыто */
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+    }
+
+    #nameModalContent {
+      background: #222;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      border: 2px solid #555;
+    }
+
+    #nameInput {
+      margin-bottom: 15px;
+    }
+
+    #saveNameBtn {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
     }
 
     /* Виртуальная клавиатура */
@@ -221,6 +259,7 @@
 </head>
 <body>
   <h1>Тренажёр Таблицы Умножения — Защита от дронов</h1>
+  <a href="records.html" style="text-align: center; color: #4CAF50; margin-bottom: 10px;">Таблица рекордов</a>
 
   <div id="gameArea">
     <div id="stats">
@@ -238,6 +277,15 @@
     <div id="inputArea">
       <input id="answerInput" placeholder="Введите ответ" autofocus readonly />
       <button id="restartBtn">🔄 Начать снова</button>
+    </div>
+  </div>
+
+  <!-- Модальное окно для имени -->
+  <div id="nameModal">
+    <div id="nameModalContent">
+      <h2>Введите ваше имя:</h2>
+      <input id="nameInput" placeholder="Игрок" />
+      <button id="saveNameBtn">Сохранить</button>
     </div>
   </div>
 
@@ -265,6 +313,10 @@
   <audio id="clickSound" src="sounds/click.mp3"></audio>
   <audio id="bgMusic" src="sounds/music.mp3" loop></audio>
   <!-- Звуки для дронов -->
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 
   <script src="game.js"></script>
 </body>
