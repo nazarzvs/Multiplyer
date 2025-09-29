@@ -506,9 +506,15 @@ function setupPlayerName() {
   });
 }
 
+/* ======= Утилиты ======= */
+function isMobile() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
 /* ======= Таблица рекордов (Firebase) ======= */
 function saveScoreToLeaderboard(playerName, score, time) {
-  const newScoreRef = database.ref('scores').push();
+  const path = isMobile() ? 'scores_mobile' : 'scores_pc';
+  const newScoreRef = database.ref(path).push();
   newScoreRef.set({
     name: playerName,
     score: score,
@@ -565,8 +571,12 @@ document.addEventListener("click", () => {
 });
 
 
-// ======= Пауза/Возобновление =======
+// ======= Обработка ввода и пауза =======
+
 document.addEventListener("keydown", (e) => {
+  // Игровые действия (ввод, пауза) не должны работать, если открыто модальное окно
+  if (nameModal.style.display === 'flex') return;
+
   if (e.key === "p" || e.key === "P") {
     if (isGameOver) return;
     isPaused = !isPaused;
@@ -576,8 +586,53 @@ document.addEventListener("keydown", (e) => {
       const muted = localStorage.getItem("musicMuted") === "true";
       if (!muted) bgMusic.play().catch(() => {});
     }
+  } else if ((e.key >= '0' && e.key <= '9') || e.key === 'Backspace') {
+    // Предотвращаем стандартное поведение для игровых клавиш
+    e.preventDefault();
+    handleInput(e.key);
   }
 });
+
+function handleInput(key) {
+  if (isGameOver || isPaused) return;
+
+  if (key >= '0' && key <= '9') {
+    if (clickSound) {
+      clickSound.volume = 0.05;
+      clickSound.currentTime = 0;
+      clickSound.play();
+    }
+    answerInput.value += key;
+    const val = parseInt(answerInput.value);
+
+    if (!isNaN(val)) {
+      // Проверяем на неверный префикс только если есть активные задачи
+      if (tasks.length > 0) {
+        const taskExists = tasks.some(t => t.answer.toString().startsWith(answerInput.value));
+        if (!taskExists) {
+          errorSound.play();
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+          answerInput.value = ""; // Сбрасываем
+          return; // Прерываем дальнейшее выполнение
+        }
+      }
+
+      // Проверяем на полное совпадение
+      const matchingTask = tasks.find(t => t.answer === val);
+      if (matchingTask) {
+        // Проверяем, не является ли этот ответ префиксом другого ответа
+        const isPrefix = tasks.some(t => t.answer !== val && t.answer.toString().startsWith(val.toString()));
+        if (!isPrefix) {
+          // Если не префикс, отправляем ответ
+          submitAnswer(val);
+        }
+        // Если является префиксом, ждем следующую цифру
+      }
+    }
+  } else if (key.toLowerCase() === 'backspace') {
+    answerInput.value = answerInput.value.slice(0, -1);
+  }
+}
 
 /* ======= Виртуальная клавиатура ======= */
 const virtualKeyboard = document.getElementById("virtualKeyboard");
@@ -585,7 +640,6 @@ const keyboardButtons = virtualKeyboard.querySelectorAll(".keyboard-btn");
 
 // Обработка нажатий на виртуальную клавиатуру
 keyboardButtons.forEach(button => {
-  // Добавляем тактильную обратную связь
   button.addEventListener("touchstart", (e) => {
     e.preventDefault();
     button.style.transform = "scale(0.95)";
@@ -594,39 +648,10 @@ keyboardButtons.forEach(button => {
   button.addEventListener("touchend", (e) => {
     e.preventDefault();
     button.style.transform = "scale(1)";
-
     const key = button.dataset.key;
-
-    if (key !== 'enter' && key !== 'clear') {
-      if (clickSound) {
-        clickSound.currentTime = 0;
-        clickSound.play();
-      }
+    if (key) {
+        handleInput(key);
     }
-    
-    // Добавляем цифру
-    answerInput.value += key;
-    const val = parseInt(answerInput.value);
-    if (!isNaN(val)) {
-      // Проверяем, есть ли такой ответ
-      const taskExists = tasks.some(t => t.answer.toString().startsWith(answerInput.value));
-      if (!taskExists) {
-        // Если нет задач с таким началом ответа, это ошибка
-        errorSound.play();
-        if (navigator.vibrate) {
-          navigator.vibrate([100, 50, 100]);
-        }
-        answerInput.value = ""; // Сбрасываем
-      } else {
-          // Если есть полное совпадение, отправляем ответ
-          const matchingTask = tasks.find(t => t.answer === val);
-          if (matchingTask) {
-              submitAnswer(val);
-          }
-      }
-    }
-    
-    // Фокусируемся на поле ввода для визуальной обратной связи
     answerInput.focus();
   });
 });
@@ -664,16 +689,6 @@ function submitAnswer(val) {
   answerInput.value = "";
   updateStats();
 }
-
-// Обновляем обработчик Enter для использования новой функции
-answerInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !isGameOver && !isPaused) {
-    const val = parseInt(answerInput.value);
-    if (!isNaN(val)) {
-      submitAnswer(val);
-    }
-  }
-});
 
 /* ======= Запуск ======= */
 

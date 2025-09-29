@@ -15,18 +15,22 @@ firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
 /* ======= Таблица рекордов (Firebase) ======= */
-function displayLeaderboard() {
-  const leaderboardList = document.getElementById('leaderboardList');
-  const scoresRef = database.ref('scores').orderByChild('score').limitToLast(10);
+function fetchAndDisplayLeaderboard(device, elementId) {
+  const leaderboardList = document.getElementById(elementId);
+  const scoresRef = database.ref(`scores_${device}`).orderByChild('score').limitToLast(10);
 
   scoresRef.on('value', (snapshot) => {
-    leaderboardList.innerHTML = '';
+    leaderboardList.innerHTML = 'Загрузка...'; // Placeholder
     const scores = [];
     snapshot.forEach((childSnapshot) => {
       scores.push(childSnapshot.val());
     });
     // Sort descending
     scores.reverse();
+    leaderboardList.innerHTML = ''; // Clear placeholder
+    if (scores.length === 0) {
+      leaderboardList.innerHTML = '<li>Нет данных.</li>';
+    }
     scores.forEach((score) => {
       const li = document.createElement('li');
       li.textContent = `${score.name}: ${score.score} (${score.time}s)`;
@@ -35,4 +39,6 @@ function displayLeaderboard() {
   });
 }
 
-displayLeaderboard();
+// Загружаем обе таблицы рекордов
+fetchAndDisplayLeaderboard('pc', 'leaderboardList_pc');
+fetchAndDisplayLeaderboard('mobile', 'leaderboardList_mobile');
